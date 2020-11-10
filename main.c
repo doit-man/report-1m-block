@@ -9,7 +9,7 @@
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
 int mutex;
-char * target;
+char* file_name;
 
 void usage() {
     printf("syntax: netfilter-test <host>\n");
@@ -26,24 +26,17 @@ void dump(unsigned char* buf, int size) {
 	printf("\n");
 }
 
-void check_host(unsigned char* payload)
+char *check_host(unsigned char* payload)
 {
 	char* search_ = "Host: ";
 	char* tmp_host_ = strstr(payload,search_);
-	char* target_ = malloc(sizeof(char)*100);
-	strcpy(target_,target);
-	printf("%s\n",target_);
 	if(tmp_host_ != NULL)
-	{
-		char* host_ = strstr(tmp_host_,target_);
-		if (host_ !=NULL)
-       		{
-         		printf("print host : %s\n",host_);
-              		mutex = 1;  
-	    	}
-      		else mutex = 0;
+	{	
+		tmp_host_ += 6;
+		return tmp_host_;		
+		      	
 	}
-	else mutex = 0;
+	else	return NULL;
 	//if (host_ !=NULL) 
 	//{
 //		//printf("print host : %s\n",host_);
@@ -117,7 +110,65 @@ static u_int32_t print_pkt (struct nfq_data *tb)
 		tcp_ = (struct libnet_tcp_hdr*)(data + (ip_->ip_hl*4));
 		http_= data + (ip_->ip_hl*4) + (tcp_->th_off*4);
 	//	printf("\n%s\n",http_);
-		check_host(http_);
+		char *check_request = "GET";
+		if(memcmp(check_request,http_,3)) 
+		{
+			FILE *file;
+			file = fopen(file_name,"r");
+			char *host_=check_host(http_);
+			if(host_!=NULL)
+			{
+			char str[256];
+			while(1){
+				int W[256] = {0};
+				fgets(str,256,file);
+				printf("%s\n\n\n\n",host_);
+				for (int i = 0, j = 1, status = 0; host_[j] != '\0';++j)
+				{
+					if (host_[i] == host_[j])
+					{
+						i++;
+						W[j]=++status;
+					}
+					else if(i>0)
+					{
+						i=0;
+						W[j]=status=0;
+					}
+
+				}
+
+				for (unsigned s = 0, f = 0; s < strlen(str);)
+				{
+					
+					while (str[s] == host_[f] && f < strlen(host_))
+					{
+			
+						s++;
+						f++;
+					}
+
+					if (f > strlen(host_) - 1)  // 완전한 문자열 찾았을 경우
+					{
+						f = W[f - 1];  // 배열값이 find의 인덱스가 됨
+						mutex = 1;
+						break;
+					}
+					else  // 찾기 전에 다른 문자가 나올 경우
+					{
+						if (W[f] == 0)
+							f = 0;  // W값이 0이면 0으로 이동
+						else if (W[f] > 0)  // W값이 0보다 크면
+							f = W[f] - 1;  // 해당 W값보다 한 칸 앞으로 이동
+						s++;  // 뒷글자로 이동
+					}
+				}
+			}
+
+		
+			}
+			fclose(file);
+		}
 	}
 
 	fputc('\n', stdout);
@@ -149,7 +200,7 @@ int main(int argc, char **argv)
 	int fd;
 	int rv;
 	char buf[4096] __attribute__ ((aligned));
-	target = argv[1];
+	file_name = argv[1];
 	printf("opening library handle\n");
 	h = nfq_open();
 	if (!h) {
@@ -204,7 +255,6 @@ int main(int argc, char **argv)
 		perror("recv failed");
 		break;
 	}
-
 	printf("unbinding from queue 0\n");
 	nfq_destroy_queue(qh);
 

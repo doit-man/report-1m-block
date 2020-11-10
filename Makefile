@@ -1,11 +1,11 @@
-all: netfilter-test
+all: 1m-block
 
-netfilter-test : main.o
-	gcc -o netfilter-test main.o -lnetfilter_queue -lnet
+1m-block : main.o
+	gcc -o 1m-block main.o -lnetfilter_queue -lnet
 
 main.o : main.c
 	gcc -c -o main.o main.c
 
 clean:
-	rm -r netfilter-test *.o
+	rm -r 1m-block *.o
 	
